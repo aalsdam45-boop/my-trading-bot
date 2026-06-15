@@ -1,26 +1,21 @@
 import os
-import logging
+import sys
 from telegram.ext import ApplicationBuilder, CommandHandler
+from telegram import Request
 
-# إعداد السجلات (Logs) لمعرفة ما يحدث داخل البوت
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-
-async def start(update, context):
-    await update.message.reply_text("البوت يعمل بشكل ممتاز ومستقر!")
-
-if __name__ == '__main__':
-    # جلب التوكن من المتغيرات (Variables) في Railway
+def main():
     TOKEN = os.environ.get("TOKEN")
     
-    # بناء التطبيق
-    app = ApplicationBuilder().token(TOKEN).build()
+    if not TOKEN:
+        sys.exit("TOKEN مفقود!")
+
+    # إضافة إعدادات الطلب لزيادة وقت الاستجابة وتجنب أخطاء الاتصال
+    request = Request(connect_timeout=15.0, read_timeout=15.0)
     
-    # إضافة الأوامر
-    app.add_handler(CommandHandler("start", start))
+    app = ApplicationBuilder().token(TOKEN).request(request).build()
     
-    print("تم تشغيل البوت بنجاح...")
-    # التشغيل باستخدام Polling
+    print("البوت بدأ العمل مع إعدادات اتصال محسنة...")
     app.run_polling()
+
+if __name__ == '__main__':
+    main()
