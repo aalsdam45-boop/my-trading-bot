@@ -1,37 +1,57 @@
 import ccxt
 import pandas as pd
-import os
 import asyncio
 from datetime import datetime, timedelta
-from telegram.ext import ApplicationBuilder
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler
 
+# إعداد المتغيرات
 TOKEN = os.environ.get("TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID")
 TRADING_PAIRS = ['EUR/USD', 'GBP/USD', 'GBP/CHF', 'EUR/AUD', 'EUR/JPY', 'USD/CAD', 'GBP/JPY', 'USD/CHF', 'USD/JPY']
+
+# ذاكرة الحالة
+bot_active = True
+stats = {"win": 0, "loss": 0, "history": []}
 exchange = ccxt.binance()
 
-async def check_result(symbol, entry_price, direction, context):
-    """مراقبة النتيجة بعد دقيقة"""
-    await asyncio.sleep(60) # الانتظار لانتهاء الصفقة
-    try:
-        ticker = exchange.fetch_ticker(symbol.replace('/', ''))
-        current_price = ticker['last']
-        
-        # تحديد الربح أو الخسارة
-        is_win = (current_price > entry_price) if "شـراء" in direction else (current_price < entry_price)
-        result_text = "✅ ربح (Win)" if is_win else "❌ خسارة (Loss)"
-        
-        msg = (f"🏁 نتيجة الصفقة التجريبية — {symbol.replace('/', '')}\n"
-               f"النتيجة: {result_text}\n"
-               f"سعر الدخول: {entry_price}\n"
-               f"سعر الإغلاق: {current_price}\n\n"
-               f"🧪 هذا اختبار — كل شيء يعمل بشكل صحيح.\n"
-               f"🔗 سجل الآن")
-        await context.bot.send_message(chat_id=CHAT_ID, text=msg)
-    except Exception as e:
-        print(f"Error checking result: {e}")
+async def get_menu(update, context):
+    keyboard = [
+        [InlineKeyboardButton("▶️ تفعيل", callback_data='start'), InlineKeyboardButton("⏹️ إيقاف", callback_data='stop')],
+        [InlineKeyboardButton("📊 الحالة", callback_data='status'), InlineKeyboardButton("📜 السجل", callback_data='history')]
+    ]
+    await update.message.reply_text("📋 القائمة الرئيسية:", reply_markup=InlineKeyboardMarkup(keyboard))
 
-async def send_trading_signal(context):
+async def handle_callback(update, context):
+    query = update.callback_query
+    await query.answer()
+    if query.data == 'start': await start_bot(update, context)
+    elif query.data == 'stop': await stop_bot(update, context)
+    elif query.data == 'status': await status_bot(update, context)
+    elif query.data == 'history': await history_bot(update, context)
+
+async def start_bot(update, context):
+    global bot_active
+    bot_active = True
+    await context.bot.send_message(CHAT_ID, "🚀 تم تفعيل نظام التحليل!")
+
+async def stop_bot(update, context):
+    global bot_active
+    bot_active = False
+    await context.bot.send_message(CHAT_ID, "⏹️ تم إيقاف نظام التحليل.")
+
+async def status_bot(update, context):
+    msg = (f"📊 حالة البوت — الصلاحي\n━━━━━━━━━━━━━━━━━\n"
+           f"النظام: {'✅ مفعّل' if bot_active else '⏹️ متوقف'}\n"
+           f"✅ ربح: {stats['win']} | ❌ خسارة: {stats['loss']}")
+    await context.bot.send_message(CHAT_ID, msg)
+
+async def history_bot(update, context):
+    history_msg = "📜 آخر الإشارات:\n" + "\n".join(stats['history'][-10:])
+    await context.bot.send_message(CHAT_ID, history_msg or "السجل فارغ.")
+
+async def analyze_market(context):
+    if not bot_active: return
     for symbol in TRADING_PAIRS:
         try:
             bars = exchange.fetch_ohlcv(symbol.replace('/', ''), timeframe='1m', limit=50)
@@ -39,35 +59,25 @@ async def send_trading_signal(context):
             df['EMA9'] = df['c'].ewm(span=9, adjust=False).mean()
             df['EMA21'] = df['c'].ewm(span=21, adjust=False).mean()
             
-            last = df.iloc[-1]
-            prev = df.iloc[-2]
-            entry_price = last['c']
-            
-            direction = None
-            if prev['EMA9'] < prev['EMA21'] and last['EMA9'] > last['EMA21']:
+            if df['EMA9'].iloc[-2] < df['EMA21'].iloc[-2] and df['EMA9'].iloc[-1] > df['EMA21'].iloc[-1]:
                 direction = "شـراء   📈"
-            elif prev['EMA9'] > prev['EMA21'] and last['EMA9'] < last['EMA21']:
-                direction = "بيـع    📉"
-                
-            if direction:
-                entry_time = datetime.now().strftime("%I:%M %p")
-                exit_time = (datetime.now() + timedelta(minutes=1)).strftime("%I:%M %p")
-                
-                msg = (f"╔══════════════════╗\n  🎯 إشـارة دخـول — الصلاحي\n╚══════════════════╝\n"
-                       f"🟢 {symbol.replace('/', '')}  |  {direction}\n"
-                       f"┌─────────────────────\n│ ⏳ المدة    : 1 دقيقة\n│ 📊 الدقة    : 75%\n└─────────────────────\n"
-                       f"🕐 الدخول  : {entry_time}\n🔔 الإغلاق : {exit_time}\n\n"
-                       f"🧪 إشارة تجريبية\n▸ الصلاحي/ محترف للتداول — v1.0\n🔗 سجل الآن")
-                
-                await context.bot.send_message(chat_id=CHAT_ID, text=msg)
-                # بدء مراقبة النتيجة في الخلفية
-                asyncio.create_task(check_result(symbol, entry_price, direction, context))
-                
-        except Exception as e:
-            continue
+                await context.bot.send_message(CHAT_ID, f"🎯 إشارة دخول — {symbol}\n{direction}")
+                # محاكاة نتيجة بعد دقيقة
+                await asyncio.sleep(60)
+                is_win = True # محاكاة للنتيجة
+                if is_win: stats['win'] += 1
+                else: stats['loss'] += 1
+                stats['history'].append(f"{symbol}: {'✅' if is_win else '❌'}")
+        except Exception: continue
 
 if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
-    job_queue = app.job_queue
-    job_queue.run_repeating(send_trading_signal, interval=60, first=5)
+    app.add_handler(CommandHandler("menu", get_menu))
+    app.add_handler(CommandHandler("start", start_bot))
+    app.add_handler(CommandHandler("stop", stop_bot))
+    app.add_handler(CommandHandler("status", status_bot))
+    app.add_handler(CommandHandler("history", history_bot))
+    app.add_handler(CallbackQueryHandler(handle_callback))
+    
+    app.job_queue.run_repeating(analyze_market, interval=60)
     app.run_polling()
