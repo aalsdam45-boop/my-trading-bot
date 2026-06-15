@@ -5,7 +5,6 @@ import asyncio
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler
 
-# إعداد المتغيرات
 TOKEN = os.environ.get("TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID")
 TRADING_PAIRS = ['EUR/USD', 'GBP/USD', 'GBP/CHF', 'EUR/AUD', 'EUR/JPY', 'USD/CAD', 'GBP/JPY', 'USD/CHF', 'USD/JPY']
@@ -15,7 +14,7 @@ stats = {"win": 0, "loss": 0, "history": []}
 exchange = ccxt.binance()
 
 async def analyze_market(bot):
-    """دالة المراقبة المستمرة"""
+    """دالة المراقبة التي تعمل بعد تشغيل البوت"""
     while True:
         if bot_active:
             for symbol in TRADING_PAIRS:
@@ -30,7 +29,7 @@ async def analyze_market(bot):
                         stats['win'] += 1
                         stats['history'].append(f"{symbol}: ✅")
                 except Exception: continue
-        await asyncio.sleep(60) # فحص السوق كل دقيقة
+        await asyncio.sleep(60)
 
 async def get_menu(update, context):
     keyboard = [
@@ -43,17 +42,18 @@ async def handle_callback(update, context):
     query = update.callback_query
     await query.answer()
     global bot_active
-    if query.data == 'start': bot_active = True; await context.bot.send_message(CHAT_ID, "🚀 تم تفعيل النظام!")
-    elif query.data == 'stop': bot_active = False; await context.bot.send_message(CHAT_ID, "⏹️ تم إيقاف النظام.")
-    elif query.data == 'status': await context.bot.send_message(CHAT_ID, f"📊 الحالة: {'✅ يعمل' if bot_active else '⏹️ متوقف'}\n✅ ربح: {stats['win']}")
+    if query.data == 'start': bot_active = True; await context.bot.send_message(CHAT_ID, "🚀 تم التفعيل!")
+    elif query.data == 'stop': bot_active = False; await context.bot.send_message(CHAT_ID, "⏹️ تم الإيقاف.")
+    elif query.data == 'status': await context.bot.send_message(CHAT_ID, f"📊 الحالة: {'✅ يعمل'}\n✅ ربح: {stats['win']}")
     elif query.data == 'history': await context.bot.send_message(CHAT_ID, "📜 آخر 10 صفقات:\n" + "\n".join(stats['history'][-10:]))
 
+async def post_init(application):
+    """هذه الدالة تعمل تلقائياً عند تشغيل البوت"""
+    application.create_task(analyze_market(application.bot))
+
 if __name__ == '__main__':
-    app = ApplicationBuilder().token(TOKEN).build()
-    
-    # تشغيل حلقة المراقبة في الخلفية
-    loop = asyncio.get_event_loop()
-    loop.create_task(analyze_market(app.bot))
+    # إضافة post_init لضمان عمل الحلقة داخل الـ Event Loop
+    app = ApplicationBuilder().token(TOKEN).post_init(post_init).build()
     
     app.add_handler(CommandHandler("menu", get_menu))
     app.add_handler(CallbackQueryHandler(handle_callback))
