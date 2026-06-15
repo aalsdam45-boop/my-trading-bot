@@ -5,30 +5,36 @@ import asyncio
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler
 
+# إعداد المتغيرات
 TOKEN = os.environ.get("TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID")
 TRADING_PAIRS = ['EUR/USD', 'GBP/USD', 'GBP/CHF', 'EUR/AUD', 'EUR/JPY', 'USD/CAD', 'GBP/JPY', 'USD/CHF', 'USD/JPY']
 
+# ذاكرة الحالة
 bot_active = True
 stats = {"win": 0, "loss": 0, "history": []}
 exchange = ccxt.binance()
 
 async def analyze_market(bot):
-    """دالة المراقبة التي تعمل بعد تشغيل البوت"""
+    """دالة المراقبة المستمرة للسوق"""
     while True:
         if bot_active:
             for symbol in TRADING_PAIRS:
                 try:
+                    # جلب البيانات
                     bars = exchange.fetch_ohlcv(symbol.replace('/', ''), timeframe='1m', limit=50)
                     df = pd.DataFrame(bars, columns=['t', 'o', 'h', 'l', 'c', 'v'])
                     df['EMA9'] = df['c'].ewm(span=9, adjust=False).mean()
                     df['EMA21'] = df['c'].ewm(span=21, adjust=False).mean()
                     
+                    # منطق الإشارة
                     if df['EMA9'].iloc[-2] < df['EMA21'].iloc[-2] and df['EMA9'].iloc[-1] > df['EMA21'].iloc[-1]:
                         await bot.send_message(CHAT_ID, f"🎯 إشارة دخول — {symbol}\nشـراء   📈")
                         stats['win'] += 1
                         stats['history'].append(f"{symbol}: ✅")
-                except Exception: continue
+                        await asyncio.sleep(60) # تهدئة بعد الإشارة
+                except Exception: 
+                    continue
         await asyncio.sleep(60)
 
 async def get_menu(update, context):
@@ -42,20 +48,33 @@ async def handle_callback(update, context):
     query = update.callback_query
     await query.answer()
     global bot_active
-    if query.data == 'start': bot_active = True; await context.bot.send_message(CHAT_ID, "🚀 تم التفعيل!")
-    elif query.data == 'stop': bot_active = False; await context.bot.send_message(CHAT_ID, "⏹️ تم الإيقاف.")
-    elif query.data == 'status': await context.bot.send_message(CHAT_ID, f"📊 الحالة: {'✅ يعمل'}\n✅ ربح: {stats['win']}")
-    elif query.data == 'history': await context.bot.send_message(CHAT_ID, "📜 آخر 10 صفقات:\n" + "\n".join(stats['history'][-10:]))
+    if query.data == 'start': 
+        bot_active = True
+        await context.bot.send_message(CHAT_ID, "🚀 تم تفعيل النظام!")
+    elif query.data == 'stop': 
+        bot_active = False
+        await context.bot.send_message(CHAT_ID, "⏹️ تم إيقاف النظام.")
+    elif query.data == 'status': 
+        await context.bot.send_message(CHAT_ID, f"📊 الحالة: {'✅ يعمل' if bot_active else '⏹️ متوقف'}\n✅ ربح: {stats['win']}")
+    elif query.data == 'history': 
+        await context.bot.send_message(CHAT_ID, "📜 آخر 10 صفقات:\n" + "\n".join(stats['history'][-10:]))
 
-async def post_init(application):
-    """هذه الدالة تعمل تلقائياً عند تشغيل البوت"""
-    application.create_task(analyze_market(application.bot))
-
-if __name__ == '__main__':
-    # إضافة post_init لضمان عمل الحلقة داخل الـ Event Loop
-    app = ApplicationBuilder().token(TOKEN).post_init(post_init).build()
-    
+async def run_bot():
+    app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("menu", get_menu))
     app.add_handler(CallbackQueryHandler(handle_callback))
     
-    app.run_polling()
+    # تشغيل حلقة التحليل كـ Task مستقل
+    asyncio.create_task(analyze_market(app.bot))
+    
+    # التشغيل الآمن مع إسقاط الاتصالات المعلقة
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling(drop_pending_updates=True)
+    await app.idle()
+
+if __name__ == '__main__':
+    try:
+        asyncio.run(run_bot())
+    except KeyboardInterrupt:
+        pass
