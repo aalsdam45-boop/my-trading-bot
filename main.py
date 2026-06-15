@@ -2,7 +2,6 @@ import os
 import ccxt
 import pandas as pd
 import asyncio
-from datetime import datetime, timedelta
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler
 
@@ -26,7 +25,7 @@ async def get_menu(update, context):
 async def handle_callback(update, context):
     query = update.callback_query
     await query.answer()
-    if query.data == 'start': 
+    if query.data == 'start':
         global bot_active
         bot_active = True
         await context.bot.send_message(CHAT_ID, "🚀 تم تفعيل نظام التحليل!")
@@ -57,8 +56,15 @@ async def analyze_market(context):
         except Exception: continue
 
 if __name__ == '__main__':
+    # بناء البوت مع تفعيل الـ JobQueue بشكل صحيح
     app = ApplicationBuilder().token(TOKEN).build()
+    
+    # التأكد من وجود الـ job_queue
+    job_queue = app.job_queue
+    job_queue.run_repeating(analyze_market, interval=60, first=10)
+    
     app.add_handler(CommandHandler("menu", get_menu))
     app.add_handler(CallbackQueryHandler(handle_callback))
-    app.job_queue.run_repeating(analyze_market, interval=60)
+    
+    print("البوت يعمل الآن...")
     app.run_polling()
