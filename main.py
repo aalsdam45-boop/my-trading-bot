@@ -1,15 +1,11 @@
-import os
 from telegram.ext import Application, CommandHandler
-
-# استخدام التوكن من المتغيرات
-TOKEN = os.environ.get("TOKEN")
-
+TOKEN = "8833295411:AAGzMSwJr70Gy6wwZflOHWUi50wTmmg4EXI"
 async def start(update, context):
     await update.message.reply_text("البوت يعمل بنجاح!")
-
-if __name__ == '__main__':
-    # بناء التطبيق بالطريقة التقليدية
+def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    print("البوت في حالة استماع...")
+    print("البوت بدأ العمل...")
     app.run_polling()
+if __name__ == '__main__':
+    main()
