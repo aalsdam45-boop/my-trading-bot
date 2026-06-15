@@ -1,4 +1,4 @@
-python-telegram-bot
-ccxt
-pandas
-pandas-ta
+python-telegram-bot==20.0
+ccxt==3.0.0
+pandas==2.0.0
+pandas-ta==0.3.14b
