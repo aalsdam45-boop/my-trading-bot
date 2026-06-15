@@ -4,32 +4,29 @@ import asyncio
 import os
 from telegram.ext import ApplicationBuilder, CommandHandler
 
-# استخدام os.environ لجلب المتغيرات من Railway
+# إعداد المتغيرات من Railway
 TOKEN = os.environ.get("TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID")
-BOT_RUNNING = True
 
-async def market_loop(app):
-    while True:
-        if BOT_RUNNING:
-            # هنا يمكنك وضع منطق التداول الخاص بك
-            # مثال لإرسال رسالة تجريبية للتأكد من العمل
-            try:
-                await app.bot.send_message(chat_id=CHAT_ID, text="🤖 البوت يعمل الآن بشكل سليم!")
-                await asyncio.sleep(600) # يرسل رسالة كل 10 دقائق
-            except Exception as e:
-                print(f"Error: {e}")
-        await asyncio.sleep(60)
+async def market_loop(context):
+    """هذه الدالة تعمل في الخلفية"""
+    try:
+        # مثال لمنطق التداول الخاص بك
+        await context.bot.send_message(chat_id=CHAT_ID, text="🤖 البوت يعمل ويراقب السوق...")
+    except Exception as e:
+        print(f"Error in loop: {e}")
 
-async def start_bot(update, context):
-    await update.message.reply_text("🚀 البوت مفعل!")
+async def start(update, context):
+    await update.message.reply_text("✅ تم تشغيل البوت بنجاح!")
 
 if __name__ == '__main__':
+    # بناء البوت
     app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start_bot))
+    app.add_handler(CommandHandler("start", start))
     
-    # الحل الجذري للـ Loop
-    loop = asyncio.get_event_loop()
-    loop.create_task(market_loop(app))
+    # إضافة المهمة المتكررة للعمل في الخلفية
+    job_queue = app.job_queue
+    job_queue.run_repeating(market_loop, interval=60, first=10)
     
+    # التشغيل
     app.run_polling()
