@@ -5,7 +5,7 @@ import asyncio
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler
 
-# إعداد المتغيرات
+# إعداد المتغيرات من Railway
 TOKEN = os.environ.get("TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID")
 TRADING_PAIRS = ['EUR/USD', 'GBP/USD', 'GBP/CHF', 'EUR/AUD', 'EUR/JPY', 'USD/CAD', 'GBP/JPY', 'USD/CHF', 'USD/JPY']
@@ -21,18 +21,16 @@ async def analyze_market(bot):
         if bot_active:
             for symbol in TRADING_PAIRS:
                 try:
-                    # جلب البيانات
                     bars = exchange.fetch_ohlcv(symbol.replace('/', ''), timeframe='1m', limit=50)
                     df = pd.DataFrame(bars, columns=['t', 'o', 'h', 'l', 'c', 'v'])
                     df['EMA9'] = df['c'].ewm(span=9, adjust=False).mean()
                     df['EMA21'] = df['c'].ewm(span=21, adjust=False).mean()
                     
-                    # منطق الإشارة
                     if df['EMA9'].iloc[-2] < df['EMA21'].iloc[-2] and df['EMA9'].iloc[-1] > df['EMA21'].iloc[-1]:
                         await bot.send_message(CHAT_ID, f"🎯 إشارة دخول — {symbol}\nشـراء   📈")
                         stats['win'] += 1
                         stats['history'].append(f"{symbol}: ✅")
-                        await asyncio.sleep(60) # تهدئة بعد الإشارة
+                        await asyncio.sleep(10)
                 except Exception: 
                     continue
         await asyncio.sleep(60)
@@ -64,17 +62,12 @@ async def run_bot():
     app.add_handler(CommandHandler("menu", get_menu))
     app.add_handler(CallbackQueryHandler(handle_callback))
     
-    # تشغيل حلقة التحليل كـ Task مستقل
+    # تشغيل حلقة التحليل في الخلفية
     asyncio.create_task(analyze_market(app.bot))
     
-    # التشغيل الآمن مع إسقاط الاتصالات المعلقة
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling(drop_pending_updates=True)
-    await app.idle()
+    # التشغيل المباشر
+    print("البوت يعمل الآن...")
+    await app.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
-    try:
-        asyncio.run(run_bot())
-    except KeyboardInterrupt:
-        pass
+    asyncio.run(run_bot())
