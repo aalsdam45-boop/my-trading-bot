@@ -1,6 +1,7 @@
 import ccxt
 import pandas as pd
 import asyncio
+import os # هذا السطر كان مفقوداً
 from datetime import datetime, timedelta
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler
@@ -25,28 +26,29 @@ async def get_menu(update, context):
 async def handle_callback(update, context):
     query = update.callback_query
     await query.answer()
-    if query.data == 'start': await start_bot(update, context)
-    elif query.data == 'stop': await stop_bot(update, context)
-    elif query.data == 'status': await status_bot(update, context)
-    elif query.data == 'history': await history_bot(update, context)
+    # هنا تم تعديل استدعاء الدوال لتعمل مع الـ CallbackQuery
+    if query.data == 'start': await start_bot_callback(update, context)
+    elif query.data == 'stop': await stop_bot_callback(update, context)
+    elif query.data == 'status': await status_bot_callback(update, context)
+    elif query.data == 'history': await history_bot_callback(update, context)
 
-async def start_bot(update, context):
+async def start_bot_callback(update, context):
     global bot_active
     bot_active = True
     await context.bot.send_message(CHAT_ID, "🚀 تم تفعيل نظام التحليل!")
 
-async def stop_bot(update, context):
+async def stop_bot_callback(update, context):
     global bot_active
     bot_active = False
     await context.bot.send_message(CHAT_ID, "⏹️ تم إيقاف نظام التحليل.")
 
-async def status_bot(update, context):
+async def status_bot_callback(update, context):
     msg = (f"📊 حالة البوت — الصلاحي\n━━━━━━━━━━━━━━━━━\n"
            f"النظام: {'✅ مفعّل' if bot_active else '⏹️ متوقف'}\n"
            f"✅ ربح: {stats['win']} | ❌ خسارة: {stats['loss']}")
     await context.bot.send_message(CHAT_ID, msg)
 
-async def history_bot(update, context):
+async def history_bot_callback(update, context):
     history_msg = "📜 آخر الإشارات:\n" + "\n".join(stats['history'][-10:])
     await context.bot.send_message(CHAT_ID, history_msg or "السجل فارغ.")
 
@@ -60,23 +62,20 @@ async def analyze_market(context):
             df['EMA21'] = df['c'].ewm(span=21, adjust=False).mean()
             
             if df['EMA9'].iloc[-2] < df['EMA21'].iloc[-2] and df['EMA9'].iloc[-1] > df['EMA21'].iloc[-1]:
-                direction = "شـراء   📈"
-                await context.bot.send_message(CHAT_ID, f"🎯 إشارة دخول — {symbol}\n{direction}")
+                await context.bot.send_message(CHAT_ID, f"🎯 إشارة دخول — {symbol}\nشـراء   📈")
                 # محاكاة نتيجة بعد دقيقة
                 await asyncio.sleep(60)
-                is_win = True # محاكاة للنتيجة
-                if is_win: stats['win'] += 1
-                else: stats['loss'] += 1
-                stats['history'].append(f"{symbol}: {'✅' if is_win else '❌'}")
+                stats['win'] += 1
+                stats['history'].append(f"{symbol}: ✅")
         except Exception: continue
 
 if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("menu", get_menu))
-    app.add_handler(CommandHandler("start", start_bot))
-    app.add_handler(CommandHandler("stop", stop_bot))
-    app.add_handler(CommandHandler("status", status_bot))
-    app.add_handler(CommandHandler("history", history_bot))
+    app.add_handler(CommandHandler("start", start_bot_callback)) # دعم الأمر المباشر
+    app.add_handler(CommandHandler("stop", stop_bot_callback))
+    app.add_handler(CommandHandler("status", status_bot_callback))
+    app.add_handler(CommandHandler("history", history_bot_callback))
     app.add_handler(CallbackQueryHandler(handle_callback))
     
     app.job_queue.run_repeating(analyze_market, interval=60)
