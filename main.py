@@ -2,30 +2,23 @@ import os
 import logging
 from telegram.ext import Application, CommandHandler
 
-# إعدادات بسيطة
 logging.basicConfig(level=logging.INFO)
 
 async def start(update, context):
-    CHAT_ID = os.environ.get("CHAT_ID")
-    if CHAT_ID:
+    chat_id = os.environ.get("CHAT_ID")
+    await update.message.reply_text(f"CHAT_ID اللي قارئه البوت: {chat_id}")
+    
+    if chat_id:
         try:
-            await context.bot.send_message(chat_id=CHAT_ID, text="البوت يعمل ويرسل!")
-            await update.message.reply_text("تم الإرسال للقناة بنجاح.")
+            await context.bot.send_message(chat_id=chat_id, text="تجربة إرسال للقناة")
+            await update.message.reply_text("تم الإرسال بنجاح")
         except Exception as e:
-            await update.message.reply_text(f"خطأ: {e}")
-    else:
-        await update.message.reply_text("يرجى إعداد CHAT_ID في المتغيرات.")
+            await update.message.reply_text(f"خطأ التفاصيل: {e}")
 
 def main():
     TOKEN = os.environ.get("TOKEN")
-    if not TOKEN:
-        return
-
-    # الطريقة المباشرة للبناء (تتجنب أخطاء _applicationbuilder.py)
     app = Application.builder().token(TOKEN).build()
-    
     app.add_handler(CommandHandler("start", start))
-    
     print("البوت يعمل الآن...")
     app.run_polling()
 
