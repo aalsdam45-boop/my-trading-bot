@@ -1,19 +1,18 @@
-from telegram.ext import Application, CommandHandler
 import os
+from telegram.ext import ApplicationBuilder, CommandHandler
 
-# التوكن يتم جلبه من Railway Variables
+# قراءة المتغيرات من Railway
 TOKEN = os.environ.get("TOKEN")
+CHAT_ID = os.environ.get("CHAT_ID")
 
 async def start(update, context):
-    await update.message.reply_text("البوت يعمل بنجاح!")
-
-def main():
-    # التأكد من استخدام حرف 'a' صغير
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    
-    print("البوت الآن في حالة استماع...")
-    app.run_polling()
+    # مثال: إرسال رسالة للقناة باستخدام المعرف
+    await context.bot.send_message(chat_id=CHAT_ID, text="البوت متصل بالقناة ويعمل بنجاح!")
+    await update.message.reply_text("تم إرسال رسالة تجريبية للقناة.")
 
 if __name__ == '__main__':
-    main()
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    
+    print("البوت يعمل الآن...")
+    app.run_polling()
