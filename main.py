@@ -1,21 +1,25 @@
 import os
 import sys
-from telegram.ext import ApplicationBuilder, CommandHandler
+from telegram.ext import ApplicationBuilder
 from telegram import Request
 
 def main():
     TOKEN = os.environ.get("TOKEN")
     
     if not TOKEN:
-        sys.exit("TOKEN مفقود!")
+        print("خطأ: التوكن غير موجود في المتغيرات")
+        sys.exit(1)
 
-    # إضافة إعدادات الطلب لزيادة وقت الاستجابة وتجنب أخطاء الاتصال
-    request = Request(connect_timeout=15.0, read_timeout=15.0)
+    # إعدادات الاتصال لتجنب أخطاء الشبكة
+    req = Request(connect_timeout=15.0, read_timeout=15.0)
     
-    app = ApplicationBuilder().token(TOKEN).request(request).build()
+    # بناء البوت
+    app = ApplicationBuilder().token(TOKEN).request(req).build()
     
-    print("البوت بدأ العمل مع إعدادات اتصال محسنة...")
-    app.run_polling()
+    print("البوت بدأ العمل بنجاح...")
+    
+    # تشغيل البوت مع تنظيف أي أوامر عالقة (حل مشكلة 409 Conflict)
+    app.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
     main()
